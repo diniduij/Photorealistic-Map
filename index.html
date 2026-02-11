@@ -1268,11 +1268,26 @@ tileset.readyPromise.then(() => {
 // Filter and toggle logic
 let redliningVisible = true;
 
+let pointsVisible = true;
+
 document.getElementById("filter360").onclick = () => {
+  pointsVisible = true;
+  document.getElementById("filterAll").classList.add('active');
+  document.getElementById("filterAll").textContent = '📍 Show All Points (ON)';
   markerEntities.forEach(e => e.show = e.locationData.type === '360-image');
 };
 document.getElementById("filterAll").onclick = () => {
-  markerEntities.forEach(e => e.show = true);
+  pointsVisible = !pointsVisible;
+  const btn = document.getElementById("filterAll");
+  if (pointsVisible) {
+    btn.textContent = '📍 Show All Points (ON)';
+    btn.classList.add('active');
+    markerEntities.forEach(e => e.show = true);
+  } else {
+    btn.textContent = '📍 Show All Points (OFF)';
+    btn.classList.remove('active');
+    markerEntities.forEach(e => e.show = false);
+  }
 };
 document.getElementById("toggleRedlining").onclick = () => {
   redliningVisible = !redliningVisible;
