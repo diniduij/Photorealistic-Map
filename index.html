@@ -871,22 +871,22 @@ Cesium.GeoJsonDataSource.load('neighborhoods.geojson', {
 // 3e. Explicitly reorder data sources to control rendering order
 // Use setTimeout to ensure all data sources are fully loaded before reordering
 setTimeout(function() {
-  if (buildingsDataSource && redliningDataSource && neighborhoodsDataSource) {
-    // Lower buildings to the bottom so they render first (appear behind everything)
-    while (viewer.dataSources.indexOf(buildingsDataSource) > 0) {
-      viewer.dataSources.lower(buildingsDataSource);
-    }
+  if (buildingsDataSource && redliningDataSource && neighborhoodsDataSource && neighborhoodsOutlineDataSource) {
+    // Remove all from collection and re-add in correct order (bottom to top)
+    viewer.dataSources.remove(buildingsDataSource, true);
+    viewer.dataSources.remove(redliningDataSource, true);
+    viewer.dataSources.remove(neighborhoodsDataSource, true);
+    viewer.dataSources.remove(neighborhoodsOutlineDataSource, true);
     
-    // Lower redlining so it's above buildings but below neighborhoods
-    while (viewer.dataSources.get(0) !== redliningDataSource && 
-           viewer.dataSources.indexOf(redliningDataSource) !== viewer.dataSources.length - 1) {
-      viewer.dataSources.lower(redliningDataSource);
-    }
+    // Add back in order: Buildings (bottom), Redlining (middle), Neighborhoods (top)
+    viewer.dataSources.add(buildingsDataSource);
+    viewer.dataSources.add(redliningDataSource);
+    viewer.dataSources.add(neighborhoodsDataSource);
+    viewer.dataSources.add(neighborhoodsOutlineDataSource);
     
-    // Neighborhoods should naturally be on top now
-    console.log('Data source rendering order reordered: Buildings (bottom) → Redlining (middle) → Neighborhoods (top)');
+    console.log('Data source rendering order: Buildings (bottom) → Redlining (middle) → Neighborhoods (top)');
   }
-}, 500);
+}, 1000);
 
 // 4. Locations & Markers
 const locations = [
