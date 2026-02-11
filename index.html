@@ -420,6 +420,7 @@ html, body, #cesiumContainer {
 
   <div class="filter-group">
     <button id="toggleBuildings" class="active" style="width: 100%;">🏢 Buildings (ON)</button>
+    <button id="toggleExtrudedBuildings" style="width: 100%; margin-top: 5px;">📐 Extruded Buildings (OFF)</button>
   </div>
 
   <div style="padding: 10px 0; font-size: 11px; color: #aaa; text-transform: uppercase; letter-spacing: 0.5px;">⏱️ Construction Year</div>
@@ -729,6 +730,56 @@ fetch('building.geojson')
     });
     
   }).catch(error => console.error('Error loading buildings:', error));
+
+// 2b. Load Extruded Buildings (alternative to Google 3D Buildings)
+let extrudedBuildingsDataSource = null;
+let extrudedBuildingsVisible = false;
+
+fetch('building.geojson')
+  .then(response => response.json())
+  .then(geojson => {
+    return Cesium.GeoJsonDataSource.load(geojson, {
+      clampToGround: true // Clamp base to ground
+    });
+  }).then(function(dataSource) {
+    viewer.dataSources.add(dataSource);
+    extrudedBuildingsDataSource = dataSource;
+
+    dataSource.entities.values.forEach(function(entity) {
+      if (Cesium.defined(entity.polygon)) {
+        try {
+          // Get height in feet and convert to meters
+          const heightFeet = entity.properties.Height ? parseFloat(entity.properties.Height.getValue()) : 10;
+          const heightMeters = heightFeet * 0.3048; // 1 foot = 0.3048 meters
+          
+          // Use white color for extruded buildings
+          const whiteColor = '#f5f5f5';
+          
+          // Style the polygon with extrusion
+          entity.polygon.material = Cesium.Color.fromCssColorString(whiteColor).withAlpha(0.8);
+          entity.polygon.outline = true;
+          entity.polygon.outlineColor = Cesium.Color.fromCssColorString('#d0d0d0').withAlpha(0.9);
+          entity.polygon.outlineWidth = 1;
+          
+          // Set heights for extrusion from ground level
+          entity.polygon.heightReference = Cesium.HeightReference.CLAMP_TO_GROUND;
+          entity.polygon.extrudedHeight = heightMeters;
+          entity.polygon.extrudedHeightReference = Cesium.HeightReference.RELATIVE_TO_GROUND;
+          
+          // Mark as extruded for reference
+          entity.isExtrudedBuilding = true;
+          entity.buildingType = colorKey;
+          
+          // Initially hide extruded buildings
+          entity.show = false;
+        } catch (e) {
+          console.warn('Error styling extruded building:', e);
+        }
+      }
+    });
+    
+    console.log('Extruded buildings loaded:', dataSource.entities.values.length, 'buildings');
+  }).catch(error => console.error('Error loading extruded buildings:', error));
 
 // 3. Load & Symbolize Redlining GeoJSON
 const gradeColors = {
@@ -1383,6 +1434,26 @@ document.getElementById("toggleBuildings").onclick = () => {
     btn.classList.add('active');
   } else {
     btn.textContent = '🏢 Buildings (OFF)';
+    btn.classList.remove('active');
+  }
+};
+
+// Toggle extruded buildings visibility
+document.getElementById("toggleExtrudedBuildings").onclick = () => {
+  extrudedBuildingsVisible = !extrudedBuildingsVisible;
+  if (extrudedBuildingsDataSource) {
+    extrudedBuildingsDataSource.entities.values.forEach(entity => {
+      if (entity.isExtrudedBuilding) {
+        entity.show = extrudedBuildingsVisible;
+      }
+    });
+  }
+  const btn = document.getElementById("toggleExtrudedBuildings");
+  if (extrudedBuildingsVisible) {
+    btn.textContent = '📐 Extruded Buildings (ON)';
+    btn.classList.add('active');
+  } else {
+    btn.textContent = '📐 Extruded Buildings (OFF)';
     btn.classList.remove('active');
   }
 };
