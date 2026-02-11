@@ -1,0 +1,1436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Trenton Redlining & 3D Interactive Map</title>
+
+<script src="https://ajax.googleapis.com/ajax/libs/cesiumjs/1.105/Build/Cesium/Cesium.js"></script>
+<link href="https://ajax.googleapis.com/ajax/libs/cesiumjs/1.105/Build/Cesium/Widgets/widgets.css" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+
+<style>
+html, body, #cesiumContainer {
+  width: 100%; height: 100%; margin: 0; overflow: hidden; background-color: #000;
+}
+
+/* UI Panel */
+#sidePanel {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background: rgba(25, 25, 25, 0.9);
+  padding: 15px;
+  border-radius: 8px;
+  z-index: 10;
+  color: white;
+  font-family: sans-serif;
+  width: 220px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 15px;
+}
+
+#sidePanel button {
+  background: #333;
+  color: white;
+  border: 1px solid #555;
+  border-radius: 4px;
+  padding: 8px;
+  cursor: pointer;
+  text-align: left;
+}
+
+#sidePanel button.active {
+  background: #2d89ef;
+  border-color: #4fc3f7;
+}
+
+/* Legend Styling */
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  margin-bottom: 6px;
+  background: #333;
+  border: 1px solid #555;
+  border-radius: 4px;
+  padding: 6px 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  opacity: 0.5;
+  color: #999;
+}
+.legend-item:hover {
+  background: #444;
+  opacity: 0.7;
+}
+.legend-item.active {
+  background: #555;
+  border-color: #4fc3f7;
+  opacity: 1;
+  color: #fff;
+}
+.dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 2px;
+  border: 1px solid rgba(255,255,255,0.3);
+  flex-shrink: 0;
+}
+.legend-label {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.opacity-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  color: #aaa;
+}
+.opacity-slider {
+  width: 60px;
+  height: 4px;
+  cursor: pointer;
+  accent-color: #4fc3f7;
+}
+
+/* Scrollable Legend Container */
+#buildingLegendContainer {
+  max-height: 300px;
+  overflow-y: auto;
+  padding-right: 4px;
+  transition: max-height 0.3s ease;
+}
+
+#buildingLegendContainer::-webkit-scrollbar {
+  width: 6px;
+}
+
+#buildingLegendContainer::-webkit-scrollbar-track {
+  background: #333;
+  border-radius: 3px;
+}
+
+#buildingLegendContainer::-webkit-scrollbar-thumb {
+  background: #555;
+  border-radius: 3px;
+}
+
+#buildingLegendContainer::-webkit-scrollbar-thumb:hover {
+  background: #666;
+}
+
+#buildingLegendContainer.collapsed {
+  max-height: 0;
+  overflow: hidden;
+}
+
+#toggleBuildingLegend {
+  width: 100%;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+#toggleBuildingLegend::after {
+  content: '▼';
+  font-size: 10px;
+  transition: transform 0.3s ease;
+}
+
+#toggleBuildingLegend.collapsed::after {
+  transform: rotate(-90deg);
+}
+
+/* Scrollable Redlining Legend Container */
+#redliningLegendContainer {
+  max-height: 300px;
+  overflow-y: auto;
+  padding-right: 4px;
+  transition: max-height 0.3s ease;
+}
+
+#redliningLegendContainer::-webkit-scrollbar {
+  width: 6px;
+}
+
+#redliningLegendContainer::-webkit-scrollbar-track {
+  background: #333;
+  border-radius: 3px;
+}
+
+#redliningLegendContainer::-webkit-scrollbar-thumb {
+  background: #555;
+  border-radius: 3px;
+}
+
+#redliningLegendContainer::-webkit-scrollbar-thumb:hover {
+  background: #666;
+}
+
+#redliningLegendContainer.collapsed {
+  max-height: 0;
+  overflow: hidden;
+}
+
+#toggleRedliningLegend {
+  width: 100%;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+#toggleRedliningLegend::after {
+  content: '▼';
+  font-size: 10px;
+  transition: transform 0.3s ease;
+}
+
+#toggleRedliningLegend.collapsed::after {
+  transform: rotate(-90deg);
+}
+
+/* Scrollable Building Legend Container */
+#buildingLegendContainer {
+  max-height: 300px;
+  overflow-y: auto;
+  padding-right: 4px;
+  transition: max-height 0.3s ease;
+}
+
+#buildingLegendContainer::-webkit-scrollbar {
+  width: 6px;
+}
+
+#buildingLegendContainer::-webkit-scrollbar-track {
+  background: #333;
+  border-radius: 3px;
+}
+
+#buildingLegendContainer::-webkit-scrollbar-thumb {
+  background: #555;
+  border-radius: 3px;
+}
+
+#buildingLegendContainer::-webkit-scrollbar-thumb:hover {
+  background: #666;
+}
+
+#buildingLegendContainer.collapsed {
+  max-height: 0;
+  overflow: hidden;
+}
+
+/* Popup */
+#popup {
+  position: absolute;
+  background: rgba(15, 15, 20, 0.98);
+  color: white;
+  padding: 0;
+  border-radius: 8px;
+  font-family: 'Segoe UI', sans-serif;
+  font-size: 13px;
+  display: none;
+  z-index: 20;
+  pointer-events: auto;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7), 0 0 1px rgba(79, 195, 247, 0.3);
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(79, 195, 247, 0.2);
+  max-width: 280px;
+  overflow: hidden;
+}
+#popup .popup-header {
+  background: linear-gradient(135deg, rgba(45, 137, 239, 0.3) 0%, rgba(79, 195, 247, 0.2) 100%);
+  padding: 12px 15px;
+  border-bottom: 1px solid rgba(79, 195, 247, 0.2);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+#popup .popup-header .grade-badge {
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 14px;
+  color: white;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+}
+#popup .popup-title {
+  flex: 1;
+}
+#popup .popup-title .feature-label {
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 2px;
+}
+#popup .popup-title .category-text {
+  font-size: 11px;
+  color: #aaa;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+#popup .popup-body {
+  padding: 12px 15px;
+}
+#popup .popup-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  font-size: 12px;
+}
+#popup .popup-row:last-child {
+  border-bottom: none;
+}
+#popup .popup-label {
+  color: #999;
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  font-weight: 500;
+}
+#popup .popup-value {
+  color: #e0e0e0;
+  font-weight: 500;
+}
+#popup .popup-badge {
+  display: inline-block;
+  background: rgba(79, 195, 247, 0.2);
+  color: #4fc3f7;
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  border: 1px solid rgba(79, 195, 247, 0.4);
+}
+#popup a {
+  color: #4fc3f7;
+  text-decoration: none;
+  font-weight: 600;
+  transition: color 0.2s ease;
+}
+#popup a:hover {
+  color: #81d4fa;
+  text-decoration: underline;
+}
+#popup .popup-footer {
+  padding: 10px 15px;
+  border-top: 1px solid rgba(79, 195, 247, 0.2);
+  background: rgba(45, 137, 239, 0.05);
+}
+#popup .popup-footer a {
+  display: block;
+  margin-top: 8px;
+  text-align: center;
+}
+</style>
+</head>
+
+<body>
+
+<div id="cesiumContainer"></div>
+
+<div id="sidePanel">
+  <div class="filter-group">
+    <button id="filterAll" class="active">📍 Show All Points</button>
+    <button id="filter360">📸 360° Images Only</button>
+    <button id="toggleNeighborhoods" class="active" style="width: 100%;">🗺️ Neighborhoods (ON)</button>
+    <button id="toggleGoogle3D" class="active" style="width: 100%;">🏢 Google 3D Buildings (ON)</button>
+  </div>
+
+  <div style="height: 1px; background: #555; margin: 8px 0;"></div>
+
+  <div class="filter-group">
+    <button id="toggleRedlining" class="active">🗺️ HOLC Redlining (ON)</button>
+    <button id="clearFeature" style="display: none;">✕ Clear Selection</button>
+  </div>
+
+  <button id="toggleRedliningLegend" class="filter-group" style="background: #333; color: white; border: 1px solid #555; border-radius: 4px; padding: 8px; cursor: pointer; margin-bottom: 8px;"><span>HOLC Grade</span></button>
+
+  <div id="redliningLegendContainer">
+  <div class="legend-item active" data-grade="A">
+    <span class="dot" style="background: #76a865;"></span>
+    <div class="legend-label">
+      <span>A: Best</span>
+      <div class="opacity-control">
+        <input type="range" class="opacity-slider" data-grade="A" min="0" max="100" value="40">
+        <span class="opacity-value">40%</span>
+      </div>
+    </div>
+  </div>
+  <div class="legend-item active" data-grade="B">
+    <span class="dot" style="background: #7cb5bd;"></span>
+    <div class="legend-label">
+      <span>B: Desirable</span>
+      <div class="opacity-control">
+        <input type="range" class="opacity-slider" data-grade="B" min="0" max="100" value="40">
+        <span class="opacity-value">40%</span>
+      </div>
+    </div>
+  </div>
+  <div class="legend-item active" data-grade="C">
+    <span class="dot" style="background: #ffff00;"></span>
+    <div class="legend-label">
+      <span>C: Declining</span>
+      <div class="opacity-control">
+        <input type="range" class="opacity-slider" data-grade="C" min="0" max="100" value="40">
+        <span class="opacity-value">40%</span>
+      </div>
+    </div>
+  </div>
+  <div class="legend-item active" data-grade="D">
+    <span class="dot" style="background: #d9838d;"></span>
+    <div class="legend-label">
+      <span>D: Hazardous</span>
+      <div class="opacity-control">
+        <input type="range" class="opacity-slider" data-grade="D" min="0" max="100" value="40">
+        <span class="opacity-value">40%</span>
+      </div>
+    </div>
+  </div>
+  <div class="legend-item active" data-grade="Other">
+    <span class="dot" style="background: #808080;"></span>
+    <div class="legend-label">
+      <span>Other</span>
+      <div class="opacity-control">
+        <input type="range" class="opacity-slider" data-grade="Other" min="0" max="100" value="40">
+        <span class="opacity-value">40%</span>
+      </div>
+    </div>
+  </div>
+  </div>
+
+  <div style="height: 1px; background: #555; margin: 12px 0;"></div>
+
+  <div class="filter-group">
+    <button id="toggleBuildings" class="active" style="width: 100%;">🏢 Buildings (ON)</button>
+  </div>
+
+  <div style="padding: 10px 0; font-size: 11px; color: #aaa; text-transform: uppercase; letter-spacing: 0.5px;">⏱️ Construction Year</div>
+  <div style="display: flex; gap: 5px; margin-bottom: 8px;">
+    <input type="range" id="buildingYearSlider" min="1800" max="2026" value="2026" style="flex: 1; accent-color: #4fc3f7;">
+    <span id="yearDisplay" style="min-width: 50px; text-align: right; color: #4fc3f7; font-weight: bold;">2026</span>
+  </div>
+
+  <button id="toggleBuildingLegend" class="filter-group" style="background: #333; color: white; border: 1px solid #555; border-radius: 4px; padding: 8px; cursor: pointer; margin-bottom: 8px;"><span>Building Type</span></button>
+
+  <div id="buildingLegendContainer">
+  <div class="legend-item active" data-buildingtype="Warehouse">
+    <span class="dot" style="background: #ff6b6b;"></span>
+    <div class="legend-label">
+      <span>Warehouse</span>
+      <div class="opacity-control">
+        <input type="range" class="building-opacity-slider" data-buildingtype="Warehouse" min="0" max="100" value="60">
+        <span class="opacity-value">60%</span>
+      </div>
+    </div>
+  </div>
+  <div class="legend-item active" data-buildingtype="MidriseApartment">
+    <span class="dot" style="background: #4ecdc4;"></span>
+    <div class="legend-label">
+      <span>Midrise Apartment</span>
+      <div class="opacity-control">
+        <input type="range" class="building-opacity-slider" data-buildingtype="MidriseApartment" min="0" max="100" value="60">
+        <span class="opacity-value">60%</span>
+      </div>
+    </div>
+  </div>
+  <div class="legend-item active" data-buildingtype="HighriseApartment">
+    <span class="dot" style="background: #1982f1;"></span>
+    <div class="legend-label">
+      <span>Highrise Apartment</span>
+      <div class="opacity-control">
+        <input type="range" class="building-opacity-slider" data-buildingtype="HighriseApartment" min="0" max="100" value="60">
+        <span class="opacity-value">60%</span>
+      </div>
+    </div>
+  </div>
+  <div class="legend-item active" data-buildingtype="IECC">
+    <span class="dot" style="background: #95e1d3;"></span>
+    <div class="legend-label">
+      <span>IECC</span>
+      <div class="opacity-control">
+        <input type="range" class="building-opacity-slider" data-buildingtype="IECC" min="0" max="100" value="60">
+        <span class="opacity-value">60%</span>
+      </div>
+    </div>
+  </div>
+  <div class="legend-item active" data-buildingtype="QuickServiceRestaurant">
+    <span class="dot" style="background: #f2994e;"></span>
+    <div class="legend-label">
+      <span>Quick Service Restaurant</span>
+      <div class="opacity-control">
+        <input type="range" class="building-opacity-slider" data-buildingtype="QuickServiceRestaurant" min="0" max="100" value="60">
+        <span class="opacity-value">60%</span>
+      </div>
+    </div>
+  </div>
+  <div class="legend-item active" data-buildingtype="RetailStandalone">
+    <span class="dot" style="background: #f2cc8f;"></span>
+    <div class="legend-label">
+      <span>Retail Standalone</span>
+      <div class="opacity-control">
+        <input type="range" class="building-opacity-slider" data-buildingtype="RetailStandalone" min="0" max="100" value="60">
+        <span class="opacity-value">60%</span>
+      </div>
+    </div>
+  </div>
+  <div class="legend-item active" data-buildingtype="RetailStripmall">
+    <span class="dot" style="background: #d4a5a5;"></span>
+    <div class="legend-label">
+      <span>Retail Stripmall</span>
+      <div class="opacity-control">
+        <input type="range" class="building-opacity-slider" data-buildingtype="RetailStripmall" min="0" max="100" value="60">
+        <span class="opacity-value">60%</span>
+      </div>
+    </div>
+  </div>
+  <div class="legend-item active" data-buildingtype="MediumOffice">
+    <span class="dot" style="background: #6bcf7f;"></span>
+    <div class="legend-label">
+      <span>Medium Office</span>
+      <div class="opacity-control">
+        <input type="range" class="building-opacity-slider" data-buildingtype="MediumOffice" min="0" max="100" value="60">
+        <span class="opacity-value">60%</span>
+      </div>
+    </div>
+  </div>
+  <div class="legend-item active" data-buildingtype="SmallOffice">
+    <span class="dot" style="background: #a8e6cf;"></span>
+    <div class="legend-label">
+      <span>Small Office</span>
+      <div class="opacity-control">
+        <input type="range" class="building-opacity-slider" data-buildingtype="SmallOffice" min="0" max="100" value="60">
+        <span class="opacity-value">60%</span>
+      </div>
+    </div>
+  </div>
+  <div class="legend-item active" data-buildingtype="Outpatient">
+    <span class="dot" style="background: #ffd3e1;"></span>
+    <div class="legend-label">
+      <span>Outpatient</span>
+      <div class="opacity-control">
+        <input type="range" class="building-opacity-slider" data-buildingtype="Outpatient" min="0" max="100" value="60">
+        <span class="opacity-value">60%</span>
+      </div>
+    </div>
+  </div>
+  <div class="legend-item active" data-buildingtype="null">
+    <span class="dot" style="background: #808080;"></span>
+    <div class="legend-label">
+      <span>Unknown</span>
+      <div class="opacity-control">
+        <input type="range" class="building-opacity-slider" data-buildingtype="null" min="0" max="100" value="60">
+        <span class="opacity-value">60%</span>
+      </div>
+    </div>
+  </div>
+  </div>
+</div>
+
+<div id="popup"></div>
+
+<script>
+// 1. Initialize Viewer
+Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI0YzEzOTJiOS04ZDk5LTQ2YTgtYTVlYS1iOWFkMjA5NWYzMTUiLCJpZCI6Mzg4NDA0LCJpYXQiOjE3NzA1NTA4MjF9.uWOUlsxIdFQiF2UXiYsdePVjY3pwZu37Pf8yR3p2QAg';
+
+const viewer = new Cesium.Viewer("cesiumContainer", {
+  baseLayerPicker: false,
+  timeline: false,
+  animation: false,
+  infoBox: false,
+  selectionIndicator: false,
+  terrainProvider: Cesium.createWorldTerrain()
+});
+
+viewer.scene.globe.baseColor = Cesium.Color.BLACK;
+
+// 2. Add Google 3D Buildings
+let google3DTilesVisible = true;
+const tileset = viewer.scene.primitives.add(
+  new Cesium.Cesium3DTileset({
+    url: "https://tile.googleapis.com/v1/3dtiles/root.json?key=AIzaSyBiAU9yNxKyMgc48aRzspTOksmm1Vgitx4"
+  })
+);
+
+// 3b. Load & Symbolize Buildings GeoJSON with 0.5m buffer
+let buildingsDataSource = null;
+let buildingsVisible = true;
+
+// Define building type colors
+const buildingTypeColors = {
+  'Warehouse': '#ff6b6b',           // Red
+  'MidriseApartment': '#4ecdc4',    // Teal
+  'HighriseApartment': '#1982f1',   // Dark blue
+  'IECC': '#95e1d3',                // Light green
+  'QuickServiceRestaurant': '#f2994e', // Orange
+  'RetailStandalone': '#f2cc8f',    // Light orange
+  'RetailStripmall': '#d4a5a5',     // Mauve
+  'MediumOffice': '#6bcf7f',        // Green
+  'SmallOffice': '#a8e6cf',         // Light mint
+  'Outpatient': '#ffd3e1',          // Pink
+  'null': '#808080'                 // Gray for null/unknown
+};
+
+// Track buildings by type for filtering
+const entitiesByBuildingType = {
+  'Warehouse': [],
+  'MidriseApartment': [],
+  'HighriseApartment': [],
+  'IECC': [],
+  'QuickServiceRestaurant': [],
+  'RetailStandalone': [],
+  'RetailStripmall': [],
+  'MediumOffice': [],
+  'SmallOffice': [],
+  'Outpatient': [],
+  'null': []
+};
+
+const visibleBuildingTypes = {
+  'Warehouse': true,
+  'MidriseApartment': true,
+  'HighriseApartment': true,
+  'IECC': true,
+  'QuickServiceRestaurant': true,
+  'RetailStandalone': true,
+  'RetailStripmall': true,
+  'MediumOffice': true,
+  'SmallOffice': true,
+  'Outpatient': true,
+  'null': true
+};
+
+const opacityByBuildingType = {
+  'Warehouse': 0.6,
+  'MidriseApartment': 0.6,
+  'HighriseApartment': 0.6,
+  'IECC': 0.6,
+  'QuickServiceRestaurant': 0.6,
+  'RetailStandalone': 0.6,
+  'RetailStripmall': 0.6,
+  'MediumOffice': 0.6,
+  'SmallOffice': 0.6,
+  'Outpatient': 0.6,
+  'null': 0.6
+};
+
+fetch('building.geojson')
+  .then(response => response.json())
+  .then(geojson => {
+    // Buffer each feature by 5 meters
+    const bufferedFeatures = geojson.features.map(feature => {
+      try {
+        return turf.buffer(feature, 0.5, { units: 'meters' });
+      } catch (e) {
+        console.warn('Could not buffer feature:', e);
+        return feature;
+      }
+    });
+    
+    const bufferedGeojson = {
+      type: 'FeatureCollection',
+      features: bufferedFeatures
+    };
+    
+    return Cesium.GeoJsonDataSource.load(bufferedGeojson, {
+      clampToGround: true
+    });
+  }).then(function(dataSource) {
+    viewer.dataSources.add(dataSource);
+    buildingsDataSource = dataSource;
+
+    dataSource.entities.values.forEach(function(entity) {
+      if (Cesium.defined(entity.polygon)) {
+        // Get building type
+        const buildingType = entity.properties.BuildingTy ? entity.properties.BuildingTy.getValue() : null;
+        const colorKey = buildingType || 'null';
+        const hexColor = buildingTypeColors[colorKey] || buildingTypeColors['null'];
+        const opacity = opacityByBuildingType[colorKey] || 0.6;
+        
+        // Set polygon styling based on building type
+        entity.polygon.material = Cesium.Color.fromCssColorString(hexColor).withAlpha(opacity);
+        entity.polygon.outline = true;
+        entity.polygon.outlineColor = Cesium.Color.fromCssColorString(hexColor).withAlpha(0.9);
+        entity.polygon.outlineWidth = 1;
+        
+        // Mark as building for reference
+        entity.isBuilding = true;
+        entity.buildingType = colorKey;
+        entity.originalColor = Cesium.Color.fromCssColorString(hexColor).withAlpha(opacity);
+        
+        // Store entity by building type for filtering
+        if (entitiesByBuildingType[colorKey]) {
+          entitiesByBuildingType[colorKey].push(entity);
+        }
+      }
+    });
+    
+    // Add opacity slider event listeners for buildings
+    document.querySelectorAll('.building-opacity-slider').forEach(slider => {
+      slider.addEventListener('input', (e) => {
+        e.stopPropagation();
+        const buildingType = slider.dataset.buildingtype;
+        const opacityPercent = parseInt(slider.value);
+        const opacityValue = opacityPercent / 100;
+        
+        opacityByBuildingType[buildingType] = opacityValue;
+        
+        // Update display value
+        slider.parentElement.querySelector('.opacity-value').textContent = opacityPercent + '%';
+        
+        // Update polygon opacity
+        if (entitiesByBuildingType[buildingType]) {
+          entitiesByBuildingType[buildingType].forEach(entity => {
+            const hexColor = buildingTypeColors[buildingType];
+            entity.polygon.material = Cesium.Color.fromCssColorString(hexColor).withAlpha(opacityValue);
+          });
+        }
+      });
+    });
+    
+    // Add event listener for year slider
+    document.getElementById('buildingYearSlider').addEventListener('input', (e) => {
+      const selectedYear = parseInt(e.target.value);
+      document.getElementById('yearDisplay').textContent = selectedYear;
+      
+      // Filter buildings by construction year
+      if (buildingsDataSource) {
+        buildingsDataSource.entities.values.forEach(entity => {
+          if (entity.isBuilding) {
+            const buildingYear = entity.properties.YR_CONSTR ? entity.properties.YR_CONSTR.getValue() : null;
+            const buildingType = entity.buildingType;
+            
+            // Show building if year is less than or equal to selected year AND the building type is visible
+            if (buildingYear && buildingYear <= selectedYear && visibleBuildingTypes[buildingType]) {
+              entity.show = true;
+            } else {
+              entity.show = false;
+            }
+          }
+        });
+      }
+    });
+    
+  }).catch(error => console.error('Error loading buildings:', error));
+
+// 3. Load & Symbolize Redlining GeoJSON
+const gradeColors = {
+  'A': Cesium.Color.fromCssColorString('#76a865').withAlpha(0.4),
+  'B': Cesium.Color.fromCssColorString('#7cb5bd').withAlpha(0.4),
+  'C': Cesium.Color.fromCssColorString('#ffff00').withAlpha(0.4),
+  'D': Cesium.Color.fromCssColorString('#d9838d').withAlpha(0.4),
+  'Other': Cesium.Color.fromCssColorString('#808080').withAlpha(0.4)
+};
+
+// Store redlining dataSource for toggle control
+let redliningDataSource = null;
+let selectedFeature = null; // Track the isolated redlining feature
+let selectedNeighborhood = null; // Track the isolated neighborhood
+let selectedBuilding = null; // Track the isolated building
+const entitiesByGrade = { 'A': [], 'B': [], 'C': [], 'D': [], 'Other': [] };
+const visibleGrades = { 'A': true, 'B': true, 'C': true, 'D': true, 'Other': true };
+const opacityByGrade = { 'A': 0.4, 'B': 0.4, 'C': 0.4, 'D': 0.4, 'Other': 0.4 };
+
+Cesium.GeoJsonDataSource.load('redlining.geojson', {
+  clampToGround: true
+}).then(function(dataSource) {
+  viewer.dataSources.add(dataSource);
+  redliningDataSource = dataSource;
+
+  dataSource.entities.values.forEach(function(entity) {
+    if (Cesium.defined(entity.polygon)) {
+      // Get grade property
+      const gradeValue = entity.properties.grade ? entity.properties.grade.getValue() : null;
+      const grade = gradeValue || 'Other';
+      const opacity = opacityByGrade[grade];
+      const color = gradeColors[grade] || Cesium.Color.GRAY.withAlpha(opacity);
+
+      entity.polygon.material = color;
+      entity.polygon.outline = true;
+      entity.polygon.outlineColor = color.withAlpha(0.8);
+      
+      // Drape over both terrain and 3D buildings
+      entity.polygon.classificationType = Cesium.ClassificationType.BOTH;
+      
+      // Store entity by grade for filtering
+      entity.gradeValue = grade;
+      if (entitiesByGrade[grade]) {
+        entitiesByGrade[grade].push(entity);
+      }
+    }
+  });
+  
+  // Add opacity slider event listeners
+  document.querySelectorAll('.opacity-slider').forEach(slider => {
+    slider.addEventListener('input', (e) => {
+      e.stopPropagation();
+      const grade = slider.dataset.grade;
+      const opacityPercent = parseInt(slider.value);
+      const opacityValue = opacityPercent / 100;
+      
+      opacityByGrade[grade] = opacityValue;
+      
+      // Update display value
+      slider.parentElement.querySelector('.opacity-value').textContent = opacityPercent + '%';
+      
+      // Update polygon opacity
+      entitiesByGrade[grade].forEach(entity => {
+        const baseColor = gradeColors[grade];
+        entity.polygon.material = baseColor.withAlpha(opacityValue);
+        entity.polygon.outlineColor = baseColor.withAlpha(0.8);
+      });
+    });
+  });
+});
+
+// 3c. Load & Symbolize Neighborhoods GeoJSON
+let neighborhoodsDataSource = null;
+let neighborhoodsOutlineDataSource = null;
+let neighborhoodsVisible = true;
+
+Cesium.GeoJsonDataSource.load('neighborhoods.geojson', {
+  clampToGround: true
+}).then(function(dataSource) {
+  viewer.dataSources.add(dataSource);
+  neighborhoodsDataSource = dataSource;
+
+  dataSource.entities.values.forEach(function(entity) {
+    if (Cesium.defined(entity.polygon)) {
+      // Set polygon styling with 10% gray fill and outline
+      entity.polygon.outlineColor = Cesium.Color.WHITE.withAlpha(1.0);
+      entity.polygon.outlineWidth = 3;
+      entity.polygon.fill = true;
+      entity.polygon.material = Cesium.Color.fromCssColorString('#808080').withAlpha(0.3);
+      entity.polygon.outline = true;
+      
+      
+      // Drape over both terrain and 3D buildings
+      entity.polygon.classificationType = Cesium.ClassificationType.BOTH;
+      
+      // Mark as neighborhood for click detection
+      entity.isNeighborhood = true;
+      
+      // Store neighborhood name from the Neighborho property
+      if (entity.properties.Neighborho) {
+        entity.neighborhoodName = entity.properties.Neighborho.getValue();
+      } else {
+        entity.neighborhoodName = 'Unknown Neighborhood';
+      }
+    }
+  });
+});
+
+// 3d. Load Neighborhoods Outline Layer (same geojson, outline only)
+Cesium.GeoJsonDataSource.load('neighborhoods.geojson', {
+  clampToGround: true
+}).then(function(dataSource) {
+  viewer.dataSources.add(dataSource);
+  neighborhoodsOutlineDataSource = dataSource;
+
+  dataSource.entities.values.forEach(function(entity) {
+    if (Cesium.defined(entity.polygon)) {
+      // Set polygon styling - outline only, no fill
+      entity.polygon.fill = false;
+      entity.polygon.outline = true;
+      entity.polygon.outlineColor = Cesium.Color.WHITE.withAlpha(1.0);
+      entity.polygon.outlineWidth = 3;
+      
+      // Drape over both terrain and 3D buildings
+      entity.polygon.classificationType = Cesium.ClassificationType.BOTH;
+      
+      // Mark as neighborhood for click detection
+      entity.isNeighborhood = true;
+      
+      // Store neighborhood name from the Neighborho property
+      if (entity.properties.Neighborho) {
+        entity.neighborhoodName = entity.properties.Neighborho.getValue();
+      } else {
+        entity.neighborhoodName = 'Unknown Neighborhood';
+      }
+    }
+  });
+});
+
+// 3e. Explicitly reorder data sources to control rendering order
+// Use setTimeout to ensure all data sources are fully loaded before reordering
+setTimeout(function() {
+  if (buildingsDataSource && redliningDataSource && neighborhoodsDataSource) {
+    // Lower buildings to the bottom so they render first (appear behind everything)
+    while (viewer.dataSources.indexOf(buildingsDataSource) > 0) {
+      viewer.dataSources.lower(buildingsDataSource);
+    }
+    
+    // Lower redlining so it's above buildings but below neighborhoods
+    while (viewer.dataSources.get(0) !== redliningDataSource && 
+           viewer.dataSources.indexOf(redliningDataSource) !== viewer.dataSources.length - 1) {
+      viewer.dataSources.lower(redliningDataSource);
+    }
+    
+    // Neighborhoods should naturally be on top now
+    console.log('Data source rendering order reordered: Buildings (bottom) → Redlining (middle) → Neighborhoods (top)');
+  }
+}, 500);
+
+// 4. Locations & Markers
+const locations = [
+  {
+    lon: -74.77928, lat: 40.22475, height: 15,
+    type: "360-image", name: "27 Perdicaris Pl",
+    link: "https://www.thinglink.com/view/scene/2076204618349544292"
+  },
+  {
+    lon: -74.77839, lat: 40.22637, height: 15,
+    type: "guided-tour", name: "Prospect & W State St",
+    link: "https://www.thinglink.com/view/scene/2076180031297553252"
+  }
+];
+
+const markerEntities = [];
+locations.forEach(loc => {
+  const ent = viewer.entities.add({
+    position: Cesium.Cartesian3.fromDegrees(loc.lon, loc.lat, loc.height),
+    point: { pixelSize: 12, color: Cesium.Color.CYAN, outlineColor: Cesium.Color.WHITE, outlineWidth: 2 },
+    label: {
+      text: loc.name,
+      font: '12px sans-serif',
+      pixelOffset: new Cesium.Cartesian2(0, -20),
+      disableDepthTestDistance: Number.POSITIVE_INFINITY 
+    },
+    locationData: loc
+  });
+  markerEntities.push(ent);
+});
+
+// 5. Interaction logic
+const popup = document.getElementById("popup");
+const handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+
+// Grade descriptions for HOLC
+const gradeDescriptions = {
+  'A': { name: 'Best', emoji: '✅' },
+  'B': { name: 'Still Desirable', emoji: '👍' },
+  'C': { name: 'Definitely Declining', emoji: '⚠️' },
+  'D': { name: 'Hazardous', emoji: '🚨' },
+  'Other': { name: 'Non-Residential', emoji: '🏢' }
+};
+
+handler.setInputAction((click) => {
+  const picked = viewer.scene.pick(click.position);
+  
+  // Check if a redlining polygon was picked
+  if (Cesium.defined(picked) && picked.id) {
+    // Check if picked object has gradeValue (redlining polygon)
+    if (Cesium.defined(picked.id.gradeValue)) {
+      // If clicking on a different feature, clear the previous selection first
+      if ((selectedFeature && selectedFeature !== picked.id) || selectedNeighborhood) {
+        clearSelection();
+      }
+      // Show redlining popup
+      showRedliningPopup(picked.id, click.position);
+      // Isolate the clicked feature
+      isolateFeature(picked.id);
+      return;
+    }
+    
+    // Check if picked object is a neighborhood
+    if (picked.id.isNeighborhood) {
+      // Clear redlining selection if any, or if clicking a different neighborhood
+      if (selectedFeature || (selectedNeighborhood && selectedNeighborhood !== picked.id)) {
+        clearSelection();
+      }
+      // Show neighborhood popup
+      showNeighborhoodPopup(picked.id, click.position);
+      // Isolate the neighborhood
+      isolateNeighborhood(picked.id);
+      return;
+    }
+    
+    // Check if picked object is a building
+    if (picked.id.isBuilding) {
+      // Clear redlining/neighborhood selection if any
+      if (selectedFeature || selectedNeighborhood) {
+        clearSelection();
+      }
+      // Show building popup
+      showBuildingPopup(picked.id, click.position);
+      // Isolate the clicked building
+      isolateBuilding(picked.id);
+      return;
+    }
+    
+    // Check if picked object has locationData (marker)
+    if (picked.id.locationData) {
+      // Clear selection when clicking on marker
+      if (selectedFeature || selectedNeighborhood || selectedBuilding) {
+        clearSelection();
+      }
+      
+      const data = picked.id.locationData;
+      const screenPos = click.position;
+      
+      popup.style.display = 'block';
+      popup.style.left = (screenPos.x + 15) + 'px';
+      popup.style.top = (screenPos.y - 15) + 'px';
+      popup.innerHTML = `
+        <div class="popup-header">
+          <div class="popup-title">
+            <div class="feature-label">${data.name}</div>
+            <div class="category-text">${data.type.replace('-', ' ')}</div>
+          </div>
+        </div>
+        <div class="popup-footer">
+          <a href="${data.link}" target="_blank">📸 Open ThingLink</a>
+        </div>
+      `;
+      return;
+    }
+  }
+  
+  // Clear selection when clicking on empty areas
+  if (selectedFeature || selectedNeighborhood || selectedBuilding) {
+    clearSelection();
+  }
+  popup.style.display = 'none';
+}, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+
+function showRedliningPopup(entity, screenPos) {
+  const props = entity.properties;
+  const grade = entity.gradeValue;
+  const gradeInfo = gradeDescriptions[grade];
+  const gradeColor = gradeColors[grade];
+  const rgbColor = `rgb(${Math.round(gradeColor.red * 255)}, ${Math.round(gradeColor.green * 255)}, ${Math.round(gradeColor.blue * 255)})`;
+  
+  const label = props.label ? props.label.getValue() : 'N/A';
+  const category = props.category ? props.category.getValue() : gradeInfo.name;
+  const areaId = props.area_id ? props.area_id.getValue() : 'N/A';
+  const residential = props.residentia ? (props.residentia.getValue() ? '✓' : '–') : '–';
+  const commercial = props.commercial ? (props.commercial.getValue() ? '✓' : '–') : '–';
+  const industrial = props.industrial ? (props.industrial.getValue() ? '✓' : '–') : '–';
+  
+  popup.style.display = 'block';
+  popup.style.left = (screenPos.x + 15) + 'px';
+  popup.style.top = (screenPos.y - 15) + 'px';
+  popup.innerHTML = `
+    <div class="popup-header">
+      <div class="grade-badge" style="background-color: ${rgbColor};">${grade}</div>
+      <div class="popup-title">
+        <div class="feature-label">${label}</div>
+        <div class="category-text">${category}</div>
+      </div>
+    </div>
+    <div class="popup-body">
+      <div class="popup-row">
+        <span class="popup-label">Area ID</span>
+        <span class="popup-value">${areaId}</span>
+      </div>
+      <div class="popup-row">
+        <span class="popup-label">Zone Type</span>
+        <span class="popup-value"><span class="popup-badge">${gradeInfo.name}</span></span>
+      </div>
+      <div class="popup-row">
+        <span class="popup-label">Residential</span>
+        <span class="popup-value" style="color: ${residential === '✓' ? '#81d4fa' : '#666'};">${residential}</span>
+      </div>
+      <div class="popup-row">
+        <span class="popup-label">Commercial</span>
+        <span class="popup-value" style="color: ${commercial === '✓' ? '#81d4fa' : '#666'};">${commercial}</span>
+      </div>
+      <div class="popup-row">
+        <span class="popup-label">Industrial</span>
+        <span class="popup-value" style="color: ${industrial === '✓' ? '#81d4fa' : '#666'};">${industrial}</span>
+      </div>
+    </div>
+  `;
+}
+
+function showNeighborhoodPopup(entity, screenPos) {
+  popup.style.display = 'block';
+  popup.style.left = (screenPos.x + 15) + 'px';
+  popup.style.top = (screenPos.y - 15) + 'px';
+  
+  const name = entity.neighborhoodName || 'Unknown';
+  
+  popup.innerHTML = `
+    <div class="popup-header">
+      <div class="popup-title">
+        <div class="feature-label">${name}</div>
+        <div class="category-text">Neighborhood</div>
+      </div>
+    </div>
+  `;
+}
+
+function showBuildingPopup(entity, screenPos) {
+  const props = entity.properties;
+  const buildingType = entity.buildingType || 'Unknown';
+  const hexColor = buildingTypeColors[buildingType] || buildingTypeColors['null'];
+  
+  const type = props.BuildingTy ? props.BuildingTy.getValue() : 'Unknown';
+  const height = props.Height ? props.Height.getValue() : 'N/A';
+  const area = props.Area ? (props.Area.getValue()).toFixed(0) : 'N/A';
+  const numFloors = props.NumFloors ? props.NumFloors.getValue() : 'N/A';
+  const yearConstructed = props.YR_CONSTR ? props.YR_CONSTR.getValue() : 'N/A';
+  
+  popup.style.display = 'block';
+  popup.style.left = (screenPos.x + 15) + 'px';
+  popup.style.top = (screenPos.y - 15) + 'px';
+  popup.innerHTML = `
+    <div class="popup-header">
+      <div style="width: 32px; height: 32px; border-radius: 4px; background-color: ${hexColor}; border: 2px solid rgba(255, 255, 255, 0.3);"></div>
+      <div class="popup-title">
+        <div class="feature-label">${type || 'Building'}</div>
+        <div class="category-text">Building Details</div>
+      </div>
+    </div>
+    <div class="popup-body">
+      <div class="popup-row">
+        <span class="popup-label">Height</span>
+        <span class="popup-value">${height} ft</span>
+      </div>
+      <div class="popup-row">
+        <span class="popup-label">Area</span>
+        <span class="popup-value">${area} m²</span>
+      </div>
+      <div class="popup-row">
+        <span class="popup-label">Floors</span>
+        <span class="popup-value">${numFloors}</span>
+      </div>
+      <div class="popup-row">
+        <span class="popup-label">Year Built</span>
+        <span class="popup-value">${yearConstructed}</span>
+      </div>
+    </div>
+  `;
+}
+
+function isolateNeighborhood(neighborhood) {
+  selectedNeighborhood = neighborhood;
+  
+  // Set selected neighborhood to 100% transparent and others to 40% gray
+  if (neighborhoodsDataSource) {
+    neighborhoodsDataSource.entities.values.forEach(entity => {
+      if (entity === neighborhood) {
+        // Selected neighborhood - completely transparent
+        entity.polygon.material = Cesium.Color.fromCssColorString('#000000').withAlpha(0);
+      } else {
+        // Other neighborhoods - 40% transparency (60% opacity)
+        entity.polygon.material = Cesium.Color.fromCssColorString('#000000').withAlpha(0.8);
+      }
+    });
+  }
+  
+  // Show clear button
+  document.getElementById("clearFeature").style.display = 'block';
+  
+  // Fly to the selected neighborhood
+  viewer.camera.flyToBoundingSphere(
+    Cesium.BoundingSphere.fromBoundingBox(
+      Cesium.BoundingRectangle.fromCartesian3Array(
+        neighborhood.polygon.hierarchy.getValue(Cesium.JulianDate.now()).positions
+      )
+    ),
+    { duration: 1.0, offset: new Cesium.HeadingPitchRange(0, Cesium.Math.toRadians(-45), 800) }
+  );
+}
+
+function isolateFeature(feature) {
+  selectedFeature = feature;
+  
+  // Dim all redlining entities except the selected one
+  if (redliningDataSource) {
+    redliningDataSource.entities.values.forEach(entity => {
+      if (entity === feature) {
+        entity.show = true;
+        // Keep original color for selected feature
+      } else {
+        // Dim non-selected features with dark gray transparent material
+        entity.polygon.material = Cesium.Color.fromCssColorString('#000000').withAlpha(0.8);
+        entity.polygon.outlineColor = Cesium.Color.fromCssColorString('#222222').withAlpha(0.5);
+        entity.show = true;
+      }
+    });
+  }
+  
+  // Show clear button
+  document.getElementById("clearFeature").style.display = 'block';
+  
+  // Fly to the selected feature
+  viewer.camera.flyToBoundingSphere(
+    Cesium.BoundingSphere.fromBoundingBox(
+      Cesium.BoundingRectangle.fromCartesian3Array(
+        feature.polygon.hierarchy.getValue(Cesium.JulianDate.now()).positions
+      )
+    ),
+    { duration: 1.0, offset: new Cesium.HeadingPitchRange(0, Cesium.Math.toRadians(-45), 800) }
+  );
+}
+
+function isolateBuilding(building) {
+  selectedBuilding = building;
+  
+  // Dim all buildings except the selected one
+  if (buildingsDataSource) {
+    buildingsDataSource.entities.values.forEach(entity => {
+      if (entity === building) {
+        entity.show = true;
+        // Keep original color for selected building
+        entity.polygon.material = entity.originalColor;
+      } else {
+        // Dim non-selected buildings with black transparent material
+        entity.polygon.material = Cesium.Color.fromCssColorString('#000000').withAlpha(0.8);
+        entity.polygon.outlineColor = Cesium.Color.fromCssColorString('#000000').withAlpha(0.8);
+        entity.show = true;
+      }
+    });
+  }
+  
+  // Show clear button
+  document.getElementById("clearFeature").style.display = 'block';
+  
+  // Fly to the selected building
+  viewer.camera.flyToBoundingSphere(
+    Cesium.BoundingSphere.fromBoundingBox(
+      Cesium.BoundingRectangle.fromCartesian3Array(
+        building.polygon.hierarchy.getValue(Cesium.JulianDate.now()).positions
+      )
+    ),
+    { duration: 1.0, offset: new Cesium.HeadingPitchRange(0, Cesium.Math.toRadians(-45), 800) }
+  );
+}
+
+function clearSelection() {
+  selectedFeature = null;
+  selectedNeighborhood = null;
+  selectedBuilding = null;
+  
+  // Restore all redlining entities with original colors and opacities
+  if (redliningDataSource) {
+    redliningDataSource.entities.values.forEach(entity => {
+      const grade = entity.gradeValue;
+      const opacity = opacityByGrade[grade];
+      const color = gradeColors[grade] || Cesium.Color.GRAY.withAlpha(opacity);
+      
+      entity.polygon.material = color;
+      entity.polygon.outlineColor = color.withAlpha(0.8);
+      entity.show = visibleGrades[grade] !== false;
+    });
+  }
+  
+  // Restore neighborhoods to original styling (10% gray with white outline)
+  if (neighborhoodsDataSource) {
+    neighborhoodsDataSource.entities.values.forEach(entity => {
+      entity.polygon.material = Cesium.Color.fromCssColorString('#808080').withAlpha(0.1);
+    });
+  }
+  
+  // Restore all buildings with original colors and visibility
+  if (buildingsDataSource) {
+    const selectedYear = parseInt(document.getElementById('buildingYearSlider').value);
+    buildingsDataSource.entities.values.forEach(entity => {
+      if (entity.isBuilding && entity.originalColor) {
+        entity.polygon.material = entity.originalColor;
+        const buildingType = entity.buildingType;
+        const buildingYear = entity.properties.YR_CONSTR ? entity.properties.YR_CONSTR.getValue() : null;
+        entity.show = visibleBuildingTypes[buildingType] !== false && buildingYear && buildingYear <= selectedYear;
+      }
+    });
+  }
+  
+  // Hide clear button
+  document.getElementById("clearFeature").style.display = 'none';
+}
+
+// 6. Camera Start
+tileset.readyPromise.then(() => {
+  viewer.camera.flyTo({
+    destination: Cesium.Cartesian3.fromDegrees(-74.779, 40.224, 800),
+    orientation: { pitch: Cesium.Math.toRadians(-30) }
+  });
+});
+
+// Filter and toggle logic
+let redliningVisible = true;
+
+let pointsVisible = true;
+
+document.getElementById("filter360").onclick = () => {
+  pointsVisible = true;
+  document.getElementById("filterAll").classList.add('active');
+  document.getElementById("filterAll").textContent = '📍 Show All Points (ON)';
+  markerEntities.forEach(e => e.show = e.locationData.type === '360-image');
+};
+document.getElementById("filterAll").onclick = () => {
+  pointsVisible = !pointsVisible;
+  const btn = document.getElementById("filterAll");
+  if (pointsVisible) {
+    btn.textContent = '📍 Show All Points (ON)';
+    btn.classList.add('active');
+    markerEntities.forEach(e => e.show = true);
+  } else {
+    btn.textContent = '📍 Show All Points (OFF)';
+    btn.classList.remove('active');
+    markerEntities.forEach(e => e.show = false);
+  }
+};
+document.getElementById("toggleRedlining").onclick = () => {
+  redliningVisible = !redliningVisible;
+  if (redliningDataSource) {
+    redliningDataSource.show = redliningVisible;
+  }
+  const btn = document.getElementById("toggleRedlining");
+  if (redliningVisible) {
+    btn.textContent = '🗺️ HOLC Redlining (ON)';
+    btn.classList.add('active');
+  } else {
+    btn.textContent = '🗺️ HOLC Redlining (OFF)';
+    btn.classList.remove('active');
+    clearSelection();
+  }
+};
+
+document.getElementById("clearFeature").onclick = clearSelection;
+
+// Grade filter logic
+document.querySelectorAll('.legend-item').forEach(item => {
+  const dotElement = item.querySelector('.dot');
+  const labelElement = item.querySelector('.legend-label > span');
+  
+  item.addEventListener('click', (e) => {
+    // Don't toggle if clicking on the slider
+    if (e.target.classList.contains('opacity-slider') || e.target.classList.contains('opacity-value')) {
+      return;
+    }
+    
+    const grade = item.dataset.grade;
+    visibleGrades[grade] = !visibleGrades[grade];
+    
+    // Toggle button styling
+    item.classList.toggle('active');
+    
+    // If a feature is isolated, don't update other grades
+    if (selectedFeature) {
+      return;
+    }
+    
+    // Update visibility of all entities for this grade
+    entitiesByGrade[grade].forEach(entity => {
+      entity.show = visibleGrades[grade];
+    });
+  });
+});
+
+// Toggle neighborhoods visibility
+document.getElementById("toggleNeighborhoods").onclick = () => {
+  neighborhoodsVisible = !neighborhoodsVisible;
+  if (neighborhoodsDataSource) {
+    neighborhoodsDataSource.show = neighborhoodsVisible;
+  }
+  if (neighborhoodsOutlineDataSource) {
+    neighborhoodsOutlineDataSource.show = neighborhoodsVisible;
+  }
+  const btn = document.getElementById("toggleNeighborhoods");
+  if (neighborhoodsVisible) {
+    btn.textContent = '🗺️ Neighborhoods (ON)';
+    btn.classList.add('active');
+  } else {
+    btn.textContent = '🗺️ Neighborhoods (OFF)';
+    btn.classList.remove('active');
+  }
+};
+
+// Toggle Google 3D Buildings visibility
+document.getElementById("toggleGoogle3D").onclick = () => {
+  google3DTilesVisible = !google3DTilesVisible;
+  if (tileset) {
+    tileset.show = google3DTilesVisible;
+  }
+  const btn = document.getElementById("toggleGoogle3D");
+  if (google3DTilesVisible) {
+    btn.textContent = '🏢 Google 3D Buildings (ON)';
+    btn.classList.add('active');
+  } else {
+    btn.textContent = '🏢 Google 3D Buildings (OFF)';
+    btn.classList.remove('active');
+  }
+};
+
+// Toggle buildings visibility
+document.getElementById("toggleBuildings").onclick = () => {
+  buildingsVisible = !buildingsVisible;
+  if (buildingsDataSource) {
+    buildingsDataSource.show = buildingsVisible;
+  }
+  const btn = document.getElementById("toggleBuildings");
+  if (buildingsVisible) {
+    btn.textContent = '🏢 Buildings (ON)';
+    btn.classList.add('active');
+  } else {
+    btn.textContent = '🏢 Buildings (OFF)';
+    btn.classList.remove('active');
+  }
+};
+
+// Toggle redlining legend visibility
+document.getElementById('toggleRedliningLegend').onclick = () => {
+  const container = document.getElementById('redliningLegendContainer');
+  const btn = document.getElementById('toggleRedliningLegend');
+  container.classList.toggle('collapsed');
+  btn.classList.toggle('collapsed');
+};
+
+// Toggle building legend visibility
+document.getElementById('toggleBuildingLegend').onclick = () => {
+  const container = document.getElementById('buildingLegendContainer');
+  const btn = document.getElementById('toggleBuildingLegend');
+  container.classList.toggle('collapsed');
+  btn.classList.toggle('collapsed');
+};
+
+// Building type filter logic
+document.querySelectorAll('.legend-item[data-buildingtype]').forEach(item => {
+  item.addEventListener('click', (e) => {
+    // Don't toggle if clicking on the slider or opacity value
+    if (e.target.classList.contains('building-opacity-slider') || e.target.classList.contains('opacity-value')) {
+      return;
+    }
+    
+    const buildingType = item.dataset.buildingtype;
+    visibleBuildingTypes[buildingType] = !visibleBuildingTypes[buildingType];
+    
+    // Update styling based on visibility state
+    if (visibleBuildingTypes[buildingType]) {
+      item.classList.add('active');
+    } else {
+      item.classList.remove('active');
+    }
+    
+    // Update visibility of all entities for this building type (respecting year slider)
+    if (entitiesByBuildingType[buildingType]) {
+      const selectedYear = parseInt(document.getElementById('buildingYearSlider').value);
+      entitiesByBuildingType[buildingType].forEach(entity => {
+        const buildingYear = entity.properties.YR_CONSTR ? entity.properties.YR_CONSTR.getValue() : null;
+        entity.show = visibleBuildingTypes[buildingType] && buildingYear && buildingYear <= selectedYear;
+      });
+    }
+  });
+});
+</script>
+</body>
+</html>
